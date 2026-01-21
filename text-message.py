@@ -6,25 +6,21 @@ import asyncio
 import time
 import re
 from students import student
+from data import phone, id, hash, m_phone
 
-api_id = 35959414
-api_hash = 'd69ab0a182b2a2882cc4a72682f39f52'
-my_phone = '+12609606109'
+api_id = id
+api_hash = hash
+my_phone = m_phone
 
 yuborilmaganlar = []  # Список для тех, кому НЕ отправили
 yuborilganlar = []    # Список для тех, кому отправили
 
 def normalize_phone(phone):
-    """
-    Нормализует номер телефона к формату 998XXXXXXXXX
-    Если в строке несколько номеров, берет первый
-    """
     if not phone:
         return None
     
     phone = str(phone).strip()
     
-    # Если есть несколько номеров в строке, берем первый
     if ' ' in phone and len(phone.split()) > 1:
         parts = phone.split()
         for part in parts:
@@ -58,9 +54,8 @@ async def main():
 
     print("🔍 Начинаю обработку номеров...")
     
-    # Создаем список кортежей (имя, нормализованный номер)
     valid_students = []
-    invalid_students = []  # Для невалидных номеров
+    invalid_students = []
     
     for name, phone in student.items():
         normalized_phone = normalize_phone(phone)
@@ -80,11 +75,9 @@ async def main():
         await client.disconnect()
         return
 
-    # Перемешиваем список для случайного порядка отправки
     random.shuffle(valid_students)
     print("🔄 Список перемешан для случайного порядка отправки")
     
-    # Лимит сообщений в день
     daily_limit = 50
     sent_count = 0
     
@@ -93,9 +86,7 @@ async def main():
     print(f"📊 Лимит на сегодня: {daily_limit} сообщений")
     print(f"{'='*50}\n")
     
-    # Простая пошаговая логика: 1 контакт → 1 сообщение → пауза
     for idx, (student_name, phone_number) in enumerate(valid_students, 1):
-        # Проверяем дневной лимит
         if sent_count >= daily_limit:
             print(f"\n⚠️ Достигнут дневной лимит ({daily_limit} сообщений)")
             break
@@ -103,7 +94,6 @@ async def main():
         print(f"\n📋 Контакт {idx}/{len(valid_students)}: {student_name}")
         
         try:
-            # 1️⃣ Импортируем ОДИН контакт
             contact = InputPhoneContact(
                 client_id=random.randint(0, 1000000),
                 phone=phone_number,
@@ -121,7 +111,6 @@ async def main():
             user = result.users[0]
             print(f"✅ Контакт импортирован: {user.phone}")
             
-            # 2️⃣ Отправляем ОДНО сообщение
             message = (
                 f"👋 Assalomu alaykum, {student_name}!\n\n"
                 f"Men Osiyo Xalqaro Universitetidan yozyapman. "
@@ -153,7 +142,6 @@ async def main():
             print(f"✅ {sent_count}. Сообщение отправлено: {student_name}")
             yuborilganlar.append(f"{student_name}: {phone_number}")
             
-            # 3️⃣ Пауза после успешной отправки (30-90 секунд)
             if idx < len(valid_students) and sent_count < daily_limit:
                 delay = random.uniform(30, 90)  # 30-90 секунд
                 print(f"⏱️ Пауза: {delay:.1f} секунд")
@@ -163,26 +151,21 @@ async def main():
             error_msg = str(e)
             print(f"❌ Ошибка при обработке {student_name}: {error_msg}")
             
-            # Определяем причину ошибки
             if "Too many" in error_msg:
                 reason = "слишком много запросов"
-                # Пауза подольше при ограничении
                 error_delay = random.uniform(30, 60)
                 print(f"⚠️ Длительная пауза после ограничения: {error_delay:.1f} сек")
                 time.sleep(error_delay)
             else:
                 reason = "ошибка отправки"
-                # Обычная пауза при другой ошибке
-                error_delay = random.uniform(60, 90)  # 1-1.5 минуты
+                error_delay = random.uniform(60, 90)
                 print(f"⚠️ Пауза после ошибки: {error_delay:.1f} сек")
                 time.sleep(error_delay)
             
             yuborilmaganlar.append(f"{student_name}: {phone_number} ({reason})")
             
-            # Продолжаем с следующим контактом
             continue
         
-        # Длинный перерыв каждые 15 сообщений
         if sent_count % 15 == 0 and sent_count > 0 and sent_count < daily_limit:
             long_break = random.uniform(30, 60)
             print(f"\n⏸️ ДЛИННЫЙ ПЕРЕРЫВ на {long_break/60:.1f} минут")
@@ -190,12 +173,10 @@ async def main():
 
     await client.disconnect()
     
-    # Финальный отчет
     print("\n" + "="*60)
     print("📊 ФИНАЛЬНЫЙ ОТЧЕТ:")
     print("="*60)
     
-    # Отдельно считаем разные категории неотправленных
     invalid_count = len([x for x in yuborilmaganlar if "невалидный номер" in x])
     error_count = len([x for x in yuborilmaganlar if "невалидный номер" not in x])
     
@@ -204,7 +185,6 @@ async def main():
     print(f"   ├─ Невалидные номера: {invalid_count}")
     print(f"   └─ Ошибки отправки: {error_count}")
     
-    # Сохраняем результаты в файлы
     if yuborilganlar:
         with open("sent_successfully.txt", "w", encoding="utf-8") as f:
             f.write("📋 СПИСОК УСПЕШНО ОТПРАВЛЕННЫХ СООБЩЕНИЙ\n")
@@ -213,13 +193,11 @@ async def main():
                 f.write(f"{i}. {item}\n")
         print(f"\n📄 Список отправленных сохранен в: sent_successfully.txt")
     
-    # ВЫВОД СПИСКА ТЕХ, КОМУ НЕ БЫЛ ОТПРАВЛЕН СМС
     if yuborilmaganlar:
         print("\n" + "="*60)
         print("❌ СПИСОК ТЕХ, КОМУ НЕ БЫЛ ОТПРАВЛЕН СМС:")
         print("="*60)
         
-        # Разделяем на категории
         invalid_numbers = [x for x in yuborilmaganlar if "невалидный номер" in x]
         failed_sending = [x for x in yuborilmaganlar if "невалидный номер" not in x]
         
@@ -253,7 +231,6 @@ async def main():
         
         print(f"\n📄 Полный список неотправленных сохранен в: not_sent.txt")
     
-    # Показываем статистику в процентах
     if yuborilganlar or yuborilmaganlar:
         total_processed = len(yuborilganlar) + len([x for x in yuborilmaganlar if "невалидный номер" not in x])
         if total_processed > 0:
