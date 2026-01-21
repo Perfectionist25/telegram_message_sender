@@ -112,29 +112,7 @@ async def main():
             print(f"✅ Контакт импортирован: {user.phone}")
             
             message = (
-                f"👋 Assalomu alaykum, {student_name}!\n\n"
-                f"Men Osiyo Xalqaro Universitetidan yozyapman. "
-                f"Talabalar monitoringini o'tkazayotganimiz uchun bir necha ma'lumot kerak bo'ldi 😊\n\n"
-                f"📋 Iltimos, quyidagilarni yozib qoldiring:\n"
-                f"▫️ Bandlik holatingiz qanday? (ishsiz/ishlayman)\n"
-                f"▫️ Agar ish bilan band bo'lsangiz:\n"
-                f"   • Ishxonangiz nomi\n"
-                f"   • Manzili (viloyat, tuman, ko'cha)\n"
-                f"   • Lavozimingiz\n"
-                f"▫️ Uyingiz manzili\n\n"
-                f"Yordamingiz uchun katta rahmat! 🤝"
-                "\n\n------------------------------------------------------------------\n\n"
-                f"👋 Здравствуйте, {student_name}!\n\n"
-                f"Пишу от имени Азиатского международного университета. "
-                f"В рамках проведения мониторинга выпускников нам требуется некоторая информация 😊\n\n"
-                f"📋 Пожалуйста, укажите следующие данные:\n"
-                f"▫️ Ваша занятость: (безработный/работаю)\n"
-                f"▫️ Если работаете:\n"
-                f"   • Название организации\n"
-                f"   • Адрес работы (область, район, улица)\n"
-                f"   • Ваша должность\n"
-                f"▫️ Домашний адрес (полный)\n\n"
-                f"Большое спасибо за помощь! 🤝"
+                'Message text goes here...'
             )
             
             await client.send_message(user.id, message)
