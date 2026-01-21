@@ -1,0 +1,263 @@
+from telethon import TelegramClient
+from telethon.tl.functions.contacts import ImportContactsRequest
+from telethon.tl.types import InputPhoneContact
+import random
+import asyncio
+import time
+import re
+from students import student
+
+api_id = 35959414
+api_hash = 'd69ab0a182b2a2882cc4a72682f39f52'
+my_phone = '+12609606109'
+
+yuborilmaganlar = []  # Список для тех, кому НЕ отправили
+yuborilganlar = []    # Список для тех, кому отправили
+
+def normalize_phone(phone):
+    """
+    Нормализует номер телефона к формату 998XXXXXXXXX
+    Если в строке несколько номеров, берет первый
+    """
+    if not phone:
+        return None
+    
+    phone = str(phone).strip()
+    
+    # Если есть несколько номеров в строке, берем первый
+    if ' ' in phone and len(phone.split()) > 1:
+        parts = phone.split()
+        for part in parts:
+            part = re.sub(r'\D', '', part)
+            if len(part) >= 9:
+                phone = part
+                break
+        else:
+            phone = re.sub(r'\D', '', parts[0])
+    else:
+        phone = re.sub(r'\D', '', phone)
+    
+    # Добавляем код страны если нужно
+    if phone.startswith('998'):
+        return phone
+    elif phone.startswith('8') and len(phone) == 11:
+        phone = '7' + phone[1:]
+        return phone
+    elif len(phone) == 9:
+        return '998' + phone
+    elif len(phone) == 10 and phone.startswith('9'):
+        return '7' + phone
+    elif len(phone) >= 10:
+        return phone
+    
+    return None
+
+async def main():
+    client = TelegramClient("session", api_id, api_hash)
+    await client.start(my_phone)
+
+    print("🔍 Начинаю обработку номеров...")
+    
+    # Создаем список кортежей (имя, нормализованный номер)
+    valid_students = []
+    invalid_students = []  # Для невалидных номеров
+    
+    for name, phone in student.items():
+        normalized_phone = normalize_phone(phone)
+        if normalized_phone:
+            valid_students.append((name, normalized_phone))
+        else:
+            invalid_students.append((name, phone))
+            yuborilmaganlar.append(f"{name}: {phone} (невалидный номер)")
+
+    print(f"\n📊 Статистика:")
+    print(f"   Всего студентов: {len(student)}")
+    print(f"   Валидные номера: {len(valid_students)}")
+    print(f"   Невалидные номера: {len(invalid_students)}")
+    
+    if not valid_students:
+        print("\n❌ Нет валидных номеров для отправки!")
+        await client.disconnect()
+        return
+
+    # Перемешиваем список для случайного порядка отправки
+    random.shuffle(valid_students)
+    print("🔄 Список перемешан для случайного порядка отправки")
+    
+    # Лимит сообщений в день
+    daily_limit = 50
+    sent_count = 0
+    
+    print(f"\n{'='*50}")
+    print(f"🚀 НАЧИНАЮ ПОСЛЕДОВАТЕЛЬНУЮ ОТПРАВКУ")
+    print(f"📊 Лимит на сегодня: {daily_limit} сообщений")
+    print(f"{'='*50}\n")
+    
+    # Простая пошаговая логика: 1 контакт → 1 сообщение → пауза
+    for idx, (student_name, phone_number) in enumerate(valid_students, 1):
+        # Проверяем дневной лимит
+        if sent_count >= daily_limit:
+            print(f"\n⚠️ Достигнут дневной лимит ({daily_limit} сообщений)")
+            break
+        
+        print(f"\n📋 Контакт {idx}/{len(valid_students)}: {student_name}")
+        
+        try:
+            # 1️⃣ Импортируем ОДИН контакт
+            contact = InputPhoneContact(
+                client_id=random.randint(0, 1000000),
+                phone=phone_number,
+                first_name=student_name[:25],
+                last_name=""
+            )
+            
+            result = await client(ImportContactsRequest([contact]))
+            
+            if not result.users:
+                print(f"❌ Не удалось импортировать контакт: {student_name}")
+                yuborilmaganlar.append(f"{student_name}: {phone_number} (не импортирован)")
+                continue
+                
+            user = result.users[0]
+            print(f"✅ Контакт импортирован: {user.phone}")
+            
+            # 2️⃣ Отправляем ОДНО сообщение
+            message = (
+                f"👋 Assalomu alaykum, {student_name}!\n\n"
+                f"Men Osiyo Xalqaro Universitetidan yozyapman. "
+                f"Talabalar monitoringini o'tkazayotganimiz uchun bir necha ma'lumot kerak bo'ldi 😊\n\n"
+                f"📋 Iltimos, quyidagilarni yozib qoldiring:\n"
+                f"▫️ Bandlik holatingiz qanday? (ishsiz/ishlayman)\n"
+                f"▫️ Agar ish bilan band bo'lsangiz:\n"
+                f"   • Ishxonangiz nomi\n"
+                f"   • Manzili (viloyat, tuman, ko'cha)\n"
+                f"   • Lavozimingiz\n"
+                f"▫️ Uyingiz manzili\n\n"
+                f"Yordamingiz uchun katta rahmat! 🤝"
+                "\n\n------------------------------------------------------------------\n\n"
+                f"👋 Здравствуйте, {student_name}!\n\n"
+                f"Пишу от имени Азиатского международного университета. "
+                f"В рамках проведения мониторинга выпускников нам требуется некоторая информация 😊\n\n"
+                f"📋 Пожалуйста, укажите следующие данные:\n"
+                f"▫️ Ваша занятость: (безработный/работаю)\n"
+                f"▫️ Если работаете:\n"
+                f"   • Название организации\n"
+                f"   • Адрес работы (область, район, улица)\n"
+                f"   • Ваша должность\n"
+                f"▫️ Домашний адрес (полный)\n\n"
+                f"Большое спасибо за помощь! 🤝"
+            )
+            
+            await client.send_message(user.id, message)
+            sent_count += 1
+            print(f"✅ {sent_count}. Сообщение отправлено: {student_name}")
+            yuborilganlar.append(f"{student_name}: {phone_number}")
+            
+            # 3️⃣ Пауза после успешной отправки (30-90 секунд)
+            if idx < len(valid_students) and sent_count < daily_limit:
+                delay = random.uniform(30, 90)  # 30-90 секунд
+                print(f"⏱️ Пауза: {delay:.1f} секунд")
+                time.sleep(delay)
+            
+        except Exception as e:
+            error_msg = str(e)
+            print(f"❌ Ошибка при обработке {student_name}: {error_msg}")
+            
+            # Определяем причину ошибки
+            if "Too many" in error_msg:
+                reason = "слишком много запросов"
+                # Пауза подольше при ограничении
+                error_delay = random.uniform(30, 60)
+                print(f"⚠️ Длительная пауза после ограничения: {error_delay:.1f} сек")
+                time.sleep(error_delay)
+            else:
+                reason = "ошибка отправки"
+                # Обычная пауза при другой ошибке
+                error_delay = random.uniform(60, 90)  # 1-1.5 минуты
+                print(f"⚠️ Пауза после ошибки: {error_delay:.1f} сек")
+                time.sleep(error_delay)
+            
+            yuborilmaganlar.append(f"{student_name}: {phone_number} ({reason})")
+            
+            # Продолжаем с следующим контактом
+            continue
+        
+        # Длинный перерыв каждые 15 сообщений
+        if sent_count % 15 == 0 and sent_count > 0 and sent_count < daily_limit:
+            long_break = random.uniform(30, 60)
+            print(f"\n⏸️ ДЛИННЫЙ ПЕРЕРЫВ на {long_break/60:.1f} минут")
+            time.sleep(long_break)
+
+    await client.disconnect()
+    
+    # Финальный отчет
+    print("\n" + "="*60)
+    print("📊 ФИНАЛЬНЫЙ ОТЧЕТ:")
+    print("="*60)
+    
+    # Отдельно считаем разные категории неотправленных
+    invalid_count = len([x for x in yuborilmaganlar if "невалидный номер" in x])
+    error_count = len([x for x in yuborilmaganlar if "невалидный номер" not in x])
+    
+    print(f"\n✅ УСПЕШНО отправлено: {len(yuborilganlar)}")
+    print(f"❌ НЕ отправлено: {len(yuborilmaganlar)}")
+    print(f"   ├─ Невалидные номера: {invalid_count}")
+    print(f"   └─ Ошибки отправки: {error_count}")
+    
+    # Сохраняем результаты в файлы
+    if yuborilganlar:
+        with open("sent_successfully.txt", "w", encoding="utf-8") as f:
+            f.write("📋 СПИСОК УСПЕШНО ОТПРАВЛЕННЫХ СООБЩЕНИЙ\n")
+            f.write("="*60 + "\n\n")
+            for i, item in enumerate(yuborilganlar, 1):
+                f.write(f"{i}. {item}\n")
+        print(f"\n📄 Список отправленных сохранен в: sent_successfully.txt")
+    
+    # ВЫВОД СПИСКА ТЕХ, КОМУ НЕ БЫЛ ОТПРАВЛЕН СМС
+    if yuborilmaganlar:
+        print("\n" + "="*60)
+        print("❌ СПИСОК ТЕХ, КОМУ НЕ БЫЛ ОТПРАВЛЕН СМС:")
+        print("="*60)
+        
+        # Разделяем на категории
+        invalid_numbers = [x for x in yuborilmaganlar if "невалидный номер" in x]
+        failed_sending = [x for x in yuborilmaganlar if "невалидный номер" not in x]
+        
+        if invalid_numbers:
+            print("\n📵 НЕВАЛИДНЫЕ НОМЕРА (нельзя отправить):")
+            for item in invalid_numbers:
+                print(f"  • {item}")
+        
+        if failed_sending:
+            print("\n⚠️ НЕОТПРАВЛЕННЫЕ ИЗ-ЗА ОШИБОК (можно попробовать позже):")
+            for item in failed_sending:
+                print(f"  • {item}")
+        
+        # Сохраняем в файл
+        with open("not_sent.txt", "w", encoding="utf-8") as f:
+            f.write("📋 СПИСОК ТЕХ, КОМУ НЕ БЫЛО ОТПРАВЛЕНО СООБЩЕНИЕ\n")
+            f.write("="*60 + "\n\n")
+            
+            if invalid_numbers:
+                f.write("НЕВАЛИДНЫЕ НОМЕРА:\n")
+                f.write("-"*40 + "\n")
+                for item in invalid_numbers:
+                    f.write(f"• {item}\n")
+                f.write("\n")
+            
+            if failed_sending:
+                f.write("ОШИБКИ ОТПРАВКИ:\n")
+                f.write("-"*40 + "\n")
+                for item in failed_sending:
+                    f.write(f"• {item}\n")
+        
+        print(f"\n📄 Полный список неотправленных сохранен в: not_sent.txt")
+    
+    # Показываем статистику в процентах
+    if yuborilganlar or yuborilmaganlar:
+        total_processed = len(yuborilganlar) + len([x for x in yuborilmaganlar if "невалидный номер" not in x])
+        if total_processed > 0:
+            success_rate = (len(yuborilganlar) / total_processed * 100)
+            print(f"\n📈 Успешность отправки: {success_rate:.1f}%")
+
+asyncio.run(main())
